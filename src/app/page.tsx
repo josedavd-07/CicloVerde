@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from 'next/navigation';
 import { createClient } from "@/utils/supabase/client";
 import {
   Leaf,
@@ -69,6 +70,8 @@ export default function CicloVerdeApp() {
 
   // Auth Forms
   const [isLogin, setIsLogin] = useState(true);
+  // State to keep temporary status changes made by admin in the "solicitudes" table
+  const [adminStatusUpdates, setAdminStatusUpdates] = useState<Record<string, string>>({});
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
@@ -174,7 +177,8 @@ export default function CicloVerdeApp() {
           data: {
             name: authName,
             role: authRole,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}`,
         }
       });
       if (error) {
@@ -191,6 +195,26 @@ export default function CicloVerdeApp() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  // Admin: update pickup status (any status)
+  const handleAdminUpdateStatus = async (pickupId: string) => {
+    const newStatus = adminStatusUpdates[pickupId];
+    if (!newStatus) return;
+    setIsLoading(true);
+    const { error } = await supabase.from('pickups').update({ status: newStatus }).eq('id', pickupId);
+    if (error) {
+      console.error('Error updating status:', error);
+      setAuthError(error.message);
+    } else {
+      // Refetch pickups after update
+      const { data, error: fetchErr } = await supabase
+        .from('pickups')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!fetchErr) setPickups(data as PickupRequest[]);
+    }
+    setIsLoading(false);
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -633,8 +657,35 @@ export default function CicloVerdeApp() {
                       <td className="p-4">{p.waste_type}</td>
                       <td className="p-4">{p.status}</td>
                       <td className="p-4">
+                        {/* Admin can change status via dropdown */}
+                        <select
+                          value={adminStatusUpdates[p.id] || p.status}
+                          onChange={(e) =>
+                            setAdminStatusUpdates((prev) => ({ ...prev, [p.id]: e.target.value }))
+                          }
+                          className="bg-zinc-800 text-white rounded px-2 py-1 text-sm mr-2"
+                        >
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="Aprobado">Aprobado</option>
+                          <option value="En camino">En camino</option>
+                          <option value="Completado">Completado</option>
+                          <option value="Recogida">Recogida</option>
+                          <option value="Disposición">Disposición</option>
+                        </select>
+                        <button
+                          onClick={() => handleAdminUpdateStatus(p.id)}
+                          className="bg-emerald-500 text-black px-3 py-1 rounded text-xs"
+                        >
+                          Guardar
+                        </button>
+                        {/* Assign collector if still pending */}
                         {p.status === "Pendiente" && (
-                           <button onClick={() => setAssigningPickupId(p.id)} className="bg-blue-500 text-white px-3 py-1 rounded text-xs">Asignar Recolector</button>
+                          <button
+                            onClick={() => setAssigningPickupId(p.id)}
+                            className="bg-blue-500 text-white px-3 py-1 rounded text-xs ml-2"
+                          >
+                            Asignar Recolector
+                          </button>
                         )}
                       </td>
                     </tr>
