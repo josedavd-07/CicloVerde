@@ -511,9 +511,22 @@ export default function CicloVerdeApp() {
   // MAIN APP DASHBOARD
   // -----------------------------------------------------
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url('/Dashboard_admind_restaurant_recollector.png')` }}>
-      {/* Capa oscura para que el texto siga siendo 100% legible sobre tu imagen */}
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-[2px] z-0 pointer-events-none"></div>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row relative overflow-hidden">
+      
+      {/* Imagen centrada, sin deformar, de alta calidad */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{ 
+          backgroundImage: `url('/Dashboard_admind_restaurant_recollector.png')`,
+          backgroundSize: 'contain', // Hace que la imagen encaje perfecto sin estirarse
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.35 // Mantiene el estilo oscuro elegante
+        }}
+      ></div>
+
+      {/* Capa oscura extra para mayor legibilidad del texto */}
+      <div className="absolute inset-0 bg-zinc-950/70 backdrop-blur-[1px] z-0 pointer-events-none"></div>
 
       {/* Dynamic Background Glassmorphism (Luces de tu paleta sobre la imagen) */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden mix-blend-screen">
