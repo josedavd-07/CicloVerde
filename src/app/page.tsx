@@ -92,6 +92,8 @@ export default function CicloVerdeApp() {
   // Profile Forms
   const [profileEmail, setProfileEmail] = useState("");
   const [profilePassword, setProfilePassword] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
 
   // Modals
@@ -172,6 +174,8 @@ export default function CicloVerdeApp() {
       
     if (profile) {
       setCurrentUser(profile as AppProfile);
+      setProfileAddress(profile.address || "");
+      setProfilePhone(profile.phone || "");
       
       // Default tabs based on role
       if (profile.role === "admin") setActiveTab("dashboard");
@@ -187,11 +191,9 @@ export default function CicloVerdeApp() {
       
     if (pickupsData) setPickups(pickupsData as PickupRequest[]);
 
-    // 3. If Admin, fetch all users
-    if (profile?.role === "admin") {
-      const { data: usersData } = await supabase.from("profiles").select("*");
-      if (usersData) setAllUsers(usersData as AppProfile[]);
-    }
+    // 3. Fetch all users (para que los recolectores puedan ver direcciones de restaurantes)
+    const { data: usersData } = await supabase.from("profiles").select("*");
+    if (usersData) setAllUsers(usersData as AppProfile[]);
     
     setIsLoading(false);
   };
@@ -261,20 +263,41 @@ export default function CicloVerdeApp() {
     setIsLoading(true);
     setProfileMessage("");
     
-    const updates: any = {};
-    if (profileEmail && profileEmail !== session?.user?.email) updates.email = profileEmail;
-    if (profilePassword) updates.password = profilePassword;
+    // 1. Actualizar Auth (Correo/Contraseña) si se llenaron
+    const authUpdates: any = {};
+    if (profileEmail && profileEmail !== session?.user?.email) authUpdates.email = profileEmail;
+    if (profilePassword) authUpdates.password = profilePassword;
     
-    if (Object.keys(updates).length > 0) {
-      const { error } = await supabase.auth.updateUser(updates);
+    let authUpdated = false;
+    if (Object.keys(authUpdates).length > 0) {
+      const { error } = await supabase.auth.updateUser(authUpdates);
       if (error) {
-        setProfileMessage("Error: " + error.message);
+        setProfileMessage("Error Auth: " + error.message);
+        setIsLoading(false);
+        return;
+      }
+      authUpdated = true;
+    }
+
+    // 2. Actualizar Tabla Profiles (Dirección/Teléfono)
+    if (currentUser) {
+      const { error: profileError } = await supabase.from('profiles').update({
+        address: profileAddress,
+        phone: profilePhone
+      }).eq('id', currentUser.id);
+
+      if (profileError) {
+        setProfileMessage("Error Perfil: " + profileError.message);
       } else {
-        setProfileMessage("¡Credenciales actualizadas! Si cambiaste tu correo, te llegará un enlace para confirmarlo.");
-        setProfilePassword("");
-        setProfileEmail("");
+        setProfileMessage(authUpdated 
+          ? "¡Perfil y credenciales actualizados! (Confirma tu nuevo correo si lo cambiaste)" 
+          : "¡Perfil actualizado correctamente!");
+        // Actualizar estado local
+        setCurrentUser({ ...currentUser, address: profileAddress, phone: profilePhone });
       }
     }
+    
+    setProfilePassword("");
     setIsLoading(false);
   };
 
@@ -693,18 +716,52 @@ export default function CicloVerdeApp() {
           {/* ================================== RECOLECTOR ================================== */}
           {currentUser.role === "collector" && activeTab === "rutas" && (
             <div className="grid gap-4 md:grid-cols-2">
-              {pickups.filter(p => p.status === "Aprobado" || p.status === "En camino").map(p => (
-                <div key={p.id} className="border border-zinc-800 rounded-2xl p-5 bg-zinc-900/30">
-                  <h4 className="font-bold text-white mb-2">{p.waste_type} - {p.date}</h4>
-                  <p className="text-xs text-zinc-400 mb-4">Estimado: {p.estimated_weight} Kg</p>
-                  {p.status === "Aprobado" ? (
-                    <button onClick={() => handleStartRoute(p.id)} className="w-full bg-amber-500 text-black py-2 rounded-xl text-sm font-bold">Iniciar Ruta</button>
-                  ) : (
-                    <button onClick={() => { setCompletingPickupId(p.id); setActualWeightInput(p.estimated_weight); }} className="w-full bg-emerald-500 text-black py-2 rounded-xl text-sm font-bold">Finalizar Recolección</button>
-                  )}
+              {pickups.filter(p => p.status === "Aprobado" || p.status === "En camino").map(p => {
+                const rest = allUsers.find(u => u.id === p.restaurant_id);
+                return (
+                  <div key={p.id} className="border border-zinc-800 rounded-2xl p-6 bg-zinc-900/60 backdrop-blur-md shadow-xl flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-bold text-lg text-emerald-400">{rest ? rest.name : "Restaurante Desconocido"}</h4>
+                          <p className="text-sm text-zinc-300 font-medium">{p.waste_type} • {p.date}</p>
+                        </div>
+                        <span className="bg-zinc-950 text-zinc-300 text-xs px-3 py-1 rounded-full border border-zinc-800">{p.estimated_weight} Kg Est.</span>
+                      </div>
+                      
+                      <div className="space-y-2 mb-6 bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/50">
+                        <p className="text-sm text-zinc-300 flex items-start gap-3">
+                          <MapPin className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5"/> 
+                          <span className="leading-tight">{rest?.address || <span className="text-zinc-500 italic">Dirección no registrada por el restaurante</span>}</span>
+                        </p>
+                        {rest?.phone && (
+                          <p className="text-sm text-zinc-300 flex items-center gap-3">
+                            <span className="w-5 h-5 flex items-center justify-center text-emerald-500 shrink-0">📞</span> 
+                            {rest.phone}
+                          </p>
+                        )}
+                        {p.notes && (
+                          <p className="text-sm text-amber-200/80 flex items-start gap-3 mt-2 border-t border-zinc-800/50 pt-2">
+                            <FileText className="w-4 h-4 shrink-0 mt-0.5"/> 
+                            <span className="italic text-xs">"{p.notes}"</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {p.status === "Aprobado" ? (
+                      <button onClick={() => handleStartRoute(p.id)} className="w-full bg-amber-500 hover:bg-amber-400 text-black py-3 rounded-xl text-sm font-bold transition-colors flex justify-center items-center gap-2"><Truck className="w-4 h-4"/> Iniciar Ruta hacia el local</button>
+                    ) : (
+                      <button onClick={() => { setCompletingPickupId(p.id); setActualWeightInput(p.estimated_weight); }} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black py-3 rounded-xl text-sm font-bold transition-colors flex justify-center items-center gap-2"><CheckCircle className="w-4 h-4"/> Finalizar Recolección</button>
+                    )}
+                  </div>
+                );
+              })}
+              {pickups.filter(p => p.status === "Aprobado" || p.status === "En camino").length === 0 && (
+                <div className="col-span-2 text-center p-12 bg-zinc-900/30 rounded-3xl border border-zinc-800 border-dashed">
+                  <p className="text-zinc-400">No tienes rutas pendientes asignadas para hoy.</p>
                 </div>
-              ))}
-              {pickups.filter(p => p.status === "Aprobado" || p.status === "En camino").length === 0 && <p>No hay rutas pendientes hoy.</p>}
+              )}
             </div>
           )}
 
@@ -792,25 +849,45 @@ export default function CicloVerdeApp() {
 
           {/* ================================== PERFIL COMÚN ================================== */}
           {activeTab === "perfil" && (
-            <div className="max-w-xl bg-zinc-900/50 border border-zinc-900 p-6 rounded-3xl mt-6">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400"/> Seguridad y Acceso</h3>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nuevo Correo (Opcional)</label>
-                  <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder={session?.user?.email} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500" />
-                  <p className="text-xs text-zinc-500 mt-1">Si cambias el correo, se cerrará tu sesión y deberás confirmar la nueva dirección.</p>
+            <div className="max-w-xl bg-zinc-900/70 backdrop-blur-md border border-zinc-800 p-8 rounded-3xl mt-6 shadow-2xl">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400"/> Datos del Perfil y Seguridad</h3>
+              <form onSubmit={handleUpdateProfile} className="space-y-5">
+                
+                {/* Datos Públicos (Dirección y Teléfono) */}
+                <div className="space-y-4 pb-6 border-b border-zinc-800">
+                  <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Información de Contacto</h4>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Dirección de Recolección</label>
+                    <input type="text" value={profileAddress} onChange={e => setProfileAddress(e.target.value)} placeholder="Ej: Av. Principal 123, Local 4" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                    <p className="text-xs text-zinc-500 mt-1">Los recolectores usarán esta dirección para llegar a ti.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Teléfono</label>
+                    <input type="tel" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="Ej: +57 300 000 0000" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nueva Contraseña (Opcional)</label>
-                  <input type="password" value={profilePassword} onChange={e => setProfilePassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500" />
+
+                {/* Datos Privados (Auth) */}
+                <div className="space-y-4 pt-2">
+                  <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Credenciales de Acceso</h4>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nuevo Correo (Opcional)</label>
+                    <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder={session?.user?.email} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nueva Contraseña (Opcional)</label>
+                    <input type="password" value={profilePassword} onChange={e => setProfilePassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                  </div>
                 </div>
+
                 {profileMessage && (
-                  <div className="p-3 bg-emerald-900/20 border border-emerald-900/50 rounded-lg">
-                    <p className="text-sm text-emerald-400 flex items-center gap-2"><CheckCircle className="w-4 h-4"/> {profileMessage}</p>
+                  <div className="p-4 bg-emerald-900/20 border border-emerald-900/50 rounded-xl animate-fade-in">
+                    <p className="text-sm text-emerald-400 flex items-center gap-2 font-medium"><CheckCircle className="w-5 h-5"/> {profileMessage}</p>
                   </div>
                 )}
-                <button type="submit" disabled={isLoading} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 px-6 rounded-xl w-full transition-colors">
-                  {isLoading ? 'Guardando...' : 'Actualizar Credenciales'}
+                
+                <button type="submit" disabled={isLoading} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3.5 px-6 rounded-xl w-full transition-colors mt-4 shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2">
+                  {isLoading ? 'Guardando...' : 'Guardar Todos los Cambios'}
                 </button>
               </form>
             </div>
