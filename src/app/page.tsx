@@ -88,7 +88,7 @@ export default function CicloVerdeApp() {
   const [authMessage, setAuthMessage] = useState("");
 
   // Pickup Forms
-  const [newWasteType, setNewWasteType] = useState("Aceite Usado");
+  const [newWasteType, setNewWasteType] = useState("Grasas y aceite");
   const [newEstimatedWeight, setNewEstimatedWeight] = useState(10);
   const [newDate, setNewDate] = useState("");
   const [newHour, setNewHour] = useState("14:00 - 16:00");
@@ -910,11 +910,9 @@ export default function CicloVerdeApp() {
               <h3 className="text-lg font-bold mb-4">Programar Nueva Recolección</h3>
               <form onSubmit={handleCreatePickup} className="space-y-4">
                 <select value={newWasteType} onChange={e => setNewWasteType(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white">
-                  <option value="Aceite Usado">Aceite Vegetal Usado</option>
-                  <option value="Orgánico">Orgánicos</option>
-                  <option value="Plásticos">Plásticos</option>
-                  <option value="Vidrio">Vidrio</option>
-                  <option value="Papel y Cartón">Papel y Cartón</option>
+                  <option value="Grasas y aceite">Grasas y aceite</option>
+                  <option value="Residuos de preparación y mesa">Residuos de preparación y mesa</option>
+                  <option value="Residuos caducados y en mal estado">Residuos caducados y en mal estado</option>
                 </select>
                 <input type="number" value={newEstimatedWeight} onChange={e => setNewEstimatedWeight(Number(e.target.value))} placeholder="Peso Estimado (Kg)" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white" required />
                 <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white" required />
