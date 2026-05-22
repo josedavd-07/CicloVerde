@@ -143,9 +143,17 @@ export default function CicloVerdeApp() {
       }
     });
 
-    // Check URL for recovery param from server callback
+    // Check URL for recovery param or auth code from Supabase
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      
+      // If Supabase ignored the redirectTo and sent the code to the root URL
+      if (code) {
+        window.location.href = `/auth/callback?code=${code}&next=/?recovery=true`;
+        return;
+      }
+
       if (searchParams.get('recovery') === 'true') {
         setActiveTab('perfil');
         setIsEditingProfile(true);
