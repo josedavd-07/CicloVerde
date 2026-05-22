@@ -513,20 +513,20 @@ export default function CicloVerdeApp() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row relative overflow-hidden">
       
-      {/* Imagen centrada, sin deformar, de alta calidad */}
+      {/* Imagen cubriendo toda la pantalla, anclada abajo para ver el diseño */}
       <div 
         className="absolute inset-0 pointer-events-none z-0"
         style={{ 
           backgroundImage: `url('/Dashboard_admind_restaurant_recollector.png')`,
-          backgroundSize: 'contain', // Hace que la imagen encaje perfecto sin estirarse
-          backgroundPosition: 'center',
+          backgroundSize: 'cover', 
+          backgroundPosition: 'bottom center', // Mantiene las hojas/diseño en la parte inferior
           backgroundRepeat: 'no-repeat',
-          opacity: 0.35 // Mantiene el estilo oscuro elegante
+          opacity: 0.45 // Un poco más vivo
         }}
       ></div>
 
       {/* Capa oscura extra para mayor legibilidad del texto */}
-      <div className="absolute inset-0 bg-zinc-950/70 backdrop-blur-[1px] z-0 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[2px] z-0 pointer-events-none"></div>
 
       {/* Dynamic Background Glassmorphism (Luces de tu paleta sobre la imagen) */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden mix-blend-screen">
@@ -535,8 +535,8 @@ export default function CicloVerdeApp() {
          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-amber-900/10 blur-[150px] rounded-full"></div>
       </div>
 
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-zinc-950/80 backdrop-blur-xl border-r border-zinc-900 flex flex-col justify-between shrink-0 relative z-10">
+      {/* Sidebar - Ahora más transparente para dejar ver el fondo */}
+      <aside className="w-full md:w-64 bg-zinc-950/40 backdrop-blur-2xl border-r border-zinc-900/50 flex flex-col justify-between shrink-0 relative z-10">
         <div>
           <div className="p-6 border-b border-zinc-900 flex items-center gap-3">
             <img src="/CicloVerde.jpeg" alt="Logo" className="w-8 h-8 rounded-lg object-cover" />
