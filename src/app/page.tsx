@@ -24,7 +24,8 @@ import {
   BarChart3,
   Award,
   ArrowRight,
-  Zap
+  Zap,
+  Bell
 } from "lucide-react";
 
 // Types matching Supabase tables
@@ -67,6 +68,8 @@ export default function CicloVerdeApp() {
   // UI States
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isLoading, setIsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<string[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Auth Forms
   const [isLogin, setIsLogin] = useState(true);
@@ -99,16 +102,19 @@ export default function CicloVerdeApp() {
 
   useEffect(() => {
     setMounted(true);
+    let mySession: any = null;
     
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      mySession = session;
       if (session) fetchInitialData(session.user.id);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      mySession = session;
       if (session) {
         fetchInitialData(session.user.id);
       } else {
@@ -118,7 +124,24 @@ export default function CicloVerdeApp() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Realtime subscription for pickups
+    const channel = supabase
+      .channel('realtime_pickups')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pickups' }, (payload) => {
+        if (mySession) fetchInitialData(mySession.user.id);
+        
+        if (payload.eventType === 'INSERT') {
+          setNotifications(prev => [`Nueva solicitud de recolección: ${payload.new.waste_type}`, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setNotifications(prev => [`El estado de la recolección cambió a ${payload.new.status} para ${payload.new.waste_type}`, ...prev]);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchInitialData = async (userId: string) => {
@@ -472,9 +495,16 @@ export default function CicloVerdeApp() {
   // MAIN APP DASHBOARD
   // -----------------------------------------------------
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row relative overflow-hidden">
+      {/* Dynamic Background Glassmorphism */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-900/10 blur-[100px] rounded-full"></div>
+         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-900/10 blur-[120px] rounded-full"></div>
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-amber-900/5 blur-[150px] rounded-full"></div>
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-zinc-950 border-r border-zinc-900 flex flex-col justify-between shrink-0">
+      <aside className="w-full md:w-64 bg-zinc-950/80 backdrop-blur-xl border-r border-zinc-900 flex flex-col justify-between shrink-0 relative z-10">
         <div>
           <div className="p-6 border-b border-zinc-900 flex items-center gap-3">
             <img src="/CicloVerde.jpeg" alt="Logo" className="w-8 h-8 rounded-lg object-cover" />
@@ -527,12 +557,45 @@ export default function CicloVerdeApp() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 bg-zinc-950 flex flex-col h-screen overflow-y-auto relative">
-        <header className="p-6 border-b border-zinc-900 bg-zinc-950/50 backdrop-blur-sm shrink-0">
-          <h1 className="text-2xl font-bold text-white capitalize">{activeTab.replace('-', ' ')}</h1>
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto relative z-10">
+        <header className="p-6 border-b border-zinc-900 bg-zinc-950/40 backdrop-blur-md shrink-0 flex justify-between items-center sticky top-0 z-40">
+          <h1 className="text-2xl font-bold text-white capitalize drop-shadow-md">{activeTab.replace('-', ' ')}</h1>
+          
+          {/* Notificaciones */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2.5 bg-zinc-900/80 border border-zinc-800 rounded-full hover:bg-zinc-800 transition-all relative group shadow-lg backdrop-blur-sm"
+            >
+              <Bell className="w-5 h-5 text-zinc-400 group-hover:text-emerald-400 transition-colors" />
+              {notifications.length > 0 && (
+                <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-zinc-900 animate-pulse"></span>
+              )}
+            </button>
+            
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-80 bg-zinc-900/95 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all">
+                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/50">
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2"><Bell className="w-4 h-4 text-emerald-400"/> Notificaciones</h3>
+                  <button onClick={() => setNotifications([])} className="text-xs text-zinc-400 hover:text-white transition-colors">Limpiar</button>
+                </div>
+                <div className="max-h-80 overflow-y-auto p-2 custom-scrollbar">
+                  {notifications.length === 0 ? (
+                    <p className="p-6 text-xs text-zinc-500 text-center">No hay notificaciones recientes</p>
+                  ) : (
+                    notifications.map((n, i) => (
+                      <div key={i} className="p-3 bg-zinc-800/40 hover:bg-zinc-800/80 rounded-xl mb-1 text-sm text-zinc-300 border border-zinc-700/30 transition-colors cursor-default">
+                        {n}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
-        <div className="p-6 flex-grow">
+        <div className="p-6 flex-grow relative z-10">
           {/* ================================== RESTAURANTE ================================== */}
           {currentUser.role === "restaurant" && activeTab === "dashboard" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
