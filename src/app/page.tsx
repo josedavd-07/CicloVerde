@@ -143,6 +143,17 @@ export default function CicloVerdeApp() {
       }
     });
 
+    // Check URL for recovery param from server callback
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('recovery') === 'true') {
+        setActiveTab('perfil');
+        setIsEditingProfile(true);
+        setProfileMessage("Por favor, ingresa tu nueva contraseña y presiona 'Guardar Todos los Cambios'.");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
     // Realtime subscription for pickups (Si está habilitado en Supabase)
     const channel = supabase
       .channel('realtime_pickups')
@@ -260,7 +271,7 @@ export default function CicloVerdeApp() {
     
     // Asume que Vercel origin funciona, sino supabase usará el default del Dashboard
     const { error } = await supabase.auth.resetPasswordForEmail(authEmail, {
-      redirectTo: window.location.origin
+      redirectTo: `${window.location.origin}/auth/callback?next=/?recovery=true`
     });
     
     if (error) {
