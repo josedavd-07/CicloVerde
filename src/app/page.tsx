@@ -357,7 +357,7 @@ export default function CicloVerdeApp() {
         ? pickups 
         : currentUser?.role === 'restaurant'
             ? pickups.filter(p => p.restaurant_id === currentUser.id)
-            : pickups.filter(p => p.collector_id === currentUser.id);
+            : pickups.filter(p => p.collector_id === currentUser?.id);
 
     relevantPickups.forEach(p => {
         tableRows.push([
