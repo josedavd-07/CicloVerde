@@ -395,7 +395,7 @@ export default function CicloVerdeApp() {
     doc.text(`Generado por: ${currentUser?.name} (${currentUser?.role})`, 14, 45);
     doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 52);
 
-    const tableColumn = ["ID Pedido", "Fecha", "Tipo", "Estado", "Peso (Kg)"];
+    const tableColumn = ["ID Pedido", "Fecha", "Tipo", "Estado", "Cantidad"];
     const tableRows: any[] = [];
     
     const relevantPickups = currentUser?.role === 'admin' 
@@ -410,7 +410,7 @@ export default function CicloVerdeApp() {
             p.date,
             p.waste_type,
             p.status,
-            (p.actual_weight || p.estimated_weight || 0).toString()
+            `${(p.actual_weight || p.estimated_weight || 0).toString()} ${p.waste_type === 'Grasas y aceite' ? 'L' : 'Kg'}`
         ]);
     });
 
@@ -883,23 +883,32 @@ export default function CicloVerdeApp() {
         <div className="p-6 flex-grow relative z-10">
           {/* ================================== RESTAURANTE ================================== */}
           {currentUser.role === "restaurant" && activeTab === "dashboard" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-                <span className="text-zinc-400 text-sm">Total Reciclado</span>
+                <span className="text-zinc-400 text-sm">Residuos Orgánicos</span>
                 <h3 className="text-3xl font-bold text-emerald-400 mt-2">
-                  {pickups.filter(p => p.status === "Completado").reduce((a, b) => a + (b.actual_weight || 0), 0)} Kg
+                  {pickups.filter(p => p.status === "Completado" && p.waste_type !== "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0)} Kg
                 </h3>
               </div>
               <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-                <span className="text-zinc-400 text-sm">CO₂ Evitado Estimado</span>
+                <span className="text-zinc-400 text-sm">Aceite Reciclado</span>
+                <h3 className="text-3xl font-bold text-yellow-500 mt-2">
+                  {pickups.filter(p => p.status === "Completado" && p.waste_type === "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0)} L
+                </h3>
+              </div>
+              <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
+                <span className="text-zinc-400 text-sm">Agua Salvada</span>
                 <h3 className="text-3xl font-bold text-blue-400 mt-2">
-                  {(pickups.filter(p => p.status === "Completado").reduce((a, b) => a + (b.actual_weight || 0), 0) * 1.5).toFixed(1)} Kg
+                  {pickups.filter(p => p.status === "Completado" && p.waste_type === "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0) * 1000} L
                 </h3>
               </div>
               <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-                <span className="text-zinc-400 text-sm">Solicitudes Pendientes</span>
-                <h3 className="text-3xl font-bold text-yellow-400 mt-2">
-                  {pickups.filter(p => p.status === "Pendiente" || p.status === "Aprobado").length}
+                <span className="text-zinc-400 text-sm">CO₂ Evitado</span>
+                <h3 className="text-3xl font-bold text-teal-400 mt-2">
+                  {(
+                    pickups.filter(p => p.status === "Completado" && p.waste_type !== "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0) * 0.5 +
+                    pickups.filter(p => p.status === "Completado" && p.waste_type === "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0) * 2.5
+                  ).toFixed(1)} Kg
                 </h3>
               </div>
             </div>
@@ -914,7 +923,7 @@ export default function CicloVerdeApp() {
                   <option value="Residuos de preparación y mesa">Residuos de preparación y mesa</option>
                   <option value="Residuos caducados y en mal estado">Residuos caducados y en mal estado</option>
                 </select>
-                <input type="number" value={newEstimatedWeight} onChange={e => setNewEstimatedWeight(Number(e.target.value))} placeholder="Peso Estimado (Kg)" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white" required />
+                <input type="number" value={newEstimatedWeight} onChange={e => setNewEstimatedWeight(Number(e.target.value))} placeholder={newWasteType === "Grasas y aceite" ? "Cantidad Estimada (Litros)" : "Peso Estimado (Kg)"} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white" required />
                 <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white" required />
                 <textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notas para el recolector" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white" />
                 <button type="submit" disabled={isLoading} className="bg-emerald-500 text-black font-bold py-3 px-6 rounded-xl w-full">{isLoading ? 'Guardando...' : 'Confirmar Solicitud'}</button>
@@ -932,7 +941,7 @@ export default function CicloVerdeApp() {
                       <td className="p-4">{p.waste_type}</td>
                       <td className="p-4">{p.date}</td>
                       <td className="p-4"><span className="text-emerald-400">{p.status}</span></td>
-                      <td className="p-4">{p.actual_weight ? `${p.actual_weight} Kg` : `${p.estimated_weight} Kg (Est)`}</td>
+                      <td className="p-4">{p.actual_weight ? `${p.actual_weight} ${p.waste_type === 'Grasas y aceite' ? 'L' : 'Kg'}` : `${p.estimated_weight} ${p.waste_type === 'Grasas y aceite' ? 'L' : 'Kg'} (Est)`}</td>
                       <td className="p-4">
                         {p.status === "Pendiente" && (
                           <button onClick={() => handleCancelPickup(p.id)} className="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded transition-colors">
@@ -961,7 +970,7 @@ export default function CicloVerdeApp() {
                           <h4 className="font-bold text-lg text-emerald-400">{rest ? rest.name : "Restaurante Desconocido"}</h4>
                           <p className="text-sm text-zinc-300 font-medium">{p.waste_type} • {p.date}</p>
                         </div>
-                        <span className="bg-zinc-950 text-zinc-300 text-xs px-3 py-1 rounded-full border border-zinc-800">{p.estimated_weight} Kg Est.</span>
+                        <span className="bg-zinc-950 text-zinc-300 text-xs px-3 py-1 rounded-full border border-zinc-800">{p.estimated_weight} {p.waste_type === 'Grasas y aceite' ? 'L' : 'Kg'} Est.</span>
                       </div>
                       
                       <div className="space-y-2 mb-6 bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/50">
@@ -1006,7 +1015,7 @@ export default function CicloVerdeApp() {
                 <thead className="bg-zinc-950 text-zinc-400"><tr><th className="p-4">Tipo</th><th className="p-4">Fecha</th><th className="p-4">Peso Real</th></tr></thead>
                 <tbody className="divide-y divide-zinc-900">
                   {pickups.filter(p => p.status === "Completado").map(p => (
-                    <tr key={p.id}><td className="p-4">{p.waste_type}</td><td className="p-4">{p.date}</td><td className="p-4 text-emerald-400">{p.actual_weight} Kg</td></tr>
+                    <tr key={p.id}><td className="p-4">{p.waste_type}</td><td className="p-4">{p.date}</td><td className="p-4 text-emerald-400">{p.actual_weight} {p.waste_type === 'Grasas y aceite' ? 'L' : 'Kg'}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -1017,9 +1026,15 @@ export default function CicloVerdeApp() {
           {currentUser.role === "admin" && activeTab === "dashboard" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-                <span className="text-zinc-400 text-sm">Total Global Reciclado</span>
+                <span className="text-zinc-400 text-sm">Orgánicos Reciclados</span>
                 <h3 className="text-3xl font-bold text-emerald-400 mt-2">
-                  {pickups.filter(p => p.status === "Completado").reduce((a, b) => a + (b.actual_weight || 0), 0)} Kg
+                  {pickups.filter(p => p.status === "Completado" && p.waste_type !== "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0)} Kg
+                </h3>
+              </div>
+              <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
+                <span className="text-zinc-400 text-sm">Aceite Reciclado</span>
+                <h3 className="text-3xl font-bold text-yellow-500 mt-2">
+                  {pickups.filter(p => p.status === "Completado" && p.waste_type === "Grasas y aceite").reduce((a, b) => a + (b.actual_weight || 0), 0)} L
                 </h3>
               </div>
               <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
@@ -1385,7 +1400,7 @@ export default function CicloVerdeApp() {
           <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
             <div className="bg-zinc-900 p-6 rounded-2xl w-full max-w-md">
               <h3 className="text-lg font-bold mb-4">Registrar Peso Final</h3>
-              <input type="number" step="0.1" value={actualWeightInput} onChange={e => setActualWeightInput(Number(e.target.value))} className="w-full p-2 mb-4 bg-zinc-950 text-white rounded" placeholder="Peso en Kg" />
+              <input type="number" step="0.1" value={actualWeightInput} onChange={e => setActualWeightInput(Number(e.target.value))} className="w-full p-2 mb-4 bg-zinc-950 text-white rounded border border-zinc-800" placeholder="Cantidad (Kg o Litros)" />
               <div className="flex gap-2">
                 <button onClick={() => setCompletingPickupId(null)} className="flex-1 bg-zinc-800 p-2 rounded">Cancelar</button>
                 <button onClick={handleCompletePickupSubmit} className="flex-1 bg-emerald-500 text-black font-bold p-2 rounded">Guardar</button>
