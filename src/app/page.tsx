@@ -25,8 +25,12 @@ import {
   Award,
   ArrowRight,
   Zap,
-  Bell
+  Bell,
+  Edit,
+  Download
 } from "lucide-react";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Types matching Supabase tables
 interface AppProfile {
@@ -101,6 +105,12 @@ export default function CicloVerdeApp() {
   const [assignCollectorId, setAssignCollectorId] = useState("");
   const [completingPickupId, setCompletingPickupId] = useState<string | null>(null);
   const [actualWeightInput, setActualWeightInput] = useState(10);
+  
+  // Admin User Edit
+  const [editingUser, setEditingUser] = useState<AppProfile | null>(null);
+  const [editUserName, setEditUserName] = useState("");
+  const [editUserPhone, setEditUserPhone] = useState("");
+  const [editUserAddress, setEditUserAddress] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -301,6 +311,75 @@ export default function CicloVerdeApp() {
     setIsLoading(false);
   };
 
+  const handleRequestAccountDeletion = () => {
+    alert("Tu solicitud de baja ha sido enviada a los administradores. Nos pondremos en contacto contigo pronto.");
+  };
+
+  const handleGeneratePDF = async () => {
+    const doc = new jsPDF();
+    
+    try {
+      // Intentar cargar la imagen de fondo
+      const bgImg = new Image();
+      bgImg.src = '/background.png';
+      await new Promise((resolve, reject) => { 
+        bgImg.onload = resolve; 
+        bgImg.onerror = reject;
+      });
+      doc.addImage(bgImg, 'PNG', 0, 0, 210, 297); // Tamaño A4
+
+      // Intentar cargar el logo
+      const logoImg = new Image();
+      logoImg.src = '/CicloVerde.jpeg';
+      await new Promise((resolve, reject) => { 
+        logoImg.onload = resolve; 
+        logoImg.onerror = reject;
+      });
+      doc.addImage(logoImg, 'JPEG', 14, 10, 25, 25);
+    } catch(e) {
+      console.error("Error cargando imágenes para el PDF", e);
+    }
+
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255); // Texto blanco para que resalte en el fondo oscuro
+    doc.text("Reporte de Actividad - Ciclo Verde", 45, 25);
+    
+    doc.setFontSize(12);
+    doc.text(`Generado por: ${currentUser?.name} (${currentUser?.role})`, 14, 45);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 52);
+
+    const tableColumn = ["ID Pedido", "Fecha", "Tipo", "Estado", "Peso (Kg)"];
+    const tableRows: any[] = [];
+    
+    const relevantPickups = currentUser?.role === 'admin' 
+        ? pickups 
+        : currentUser?.role === 'restaurant'
+            ? pickups.filter(p => p.restaurant_id === currentUser.id)
+            : pickups.filter(p => p.collector_id === currentUser.id);
+
+    relevantPickups.forEach(p => {
+        tableRows.push([
+            p.id.slice(0, 8),
+            p.date,
+            p.waste_type,
+            p.status,
+            (p.actual_weight || p.estimated_weight || 0).toString()
+        ]);
+    });
+
+    autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 60,
+        styles: { fontSize: 10, cellPadding: 4, textColor: [40, 40, 40] },
+        headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] }, // emerald-500
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        margin: { top: 60 }
+    });
+
+    doc.save("Reporte_CicloVerde.pdf");
+  };
+
   // RESTAURANT ACTIONS
   const handleCreatePickup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -393,6 +472,38 @@ export default function CicloVerdeApp() {
   const getRestaurantName = (restId: string) => {
     const rest = allUsers.find(u => u.id === restId);
     return rest ? rest.name : "Restaurante";
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editingUser) return;
+    setIsLoading(true);
+    const { error } = await supabase.from('profiles').update({
+        name: editUserName,
+        phone: editUserPhone,
+        address: editUserAddress
+    }).eq('id', editingUser.id);
+    
+    if (!error) {
+        setAllUsers(allUsers.map(u => u.id === editingUser.id ? { ...u, name: editUserName, phone: editUserPhone, address: editUserAddress } : u));
+        setEditingUser(null);
+    } else {
+        alert("Error al actualizar usuario: " + error.message);
+    }
+    setIsLoading(false);
+  };
+
+  const handleToggleUserStatus = async (user: AppProfile) => {
+    if(!confirm(`¿Estás seguro de ${user.status === 'active' ? 'desactivar' : 'activar'} la cuenta de ${user.name}?`)) return;
+    
+    setIsLoading(true);
+    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+    const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', user.id);
+    if (!error) {
+        setAllUsers(allUsers.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+    } else {
+        alert("Error al cambiar estado: " + error.message);
+    }
+    setIsLoading(false);
   };
 
   if (!mounted) return null;
@@ -621,7 +732,12 @@ export default function CicloVerdeApp() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto relative z-10">
         <header className="p-6 border-b border-zinc-900 bg-zinc-950/40 backdrop-blur-md shrink-0 flex justify-between items-center sticky top-0 z-40">
-          <h1 className="text-2xl font-bold text-white capitalize drop-shadow-md">{activeTab.replace('-', ' ')}</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold text-white capitalize drop-shadow-md">{activeTab.replace('-', ' ')}</h1>
+            <button onClick={handleGeneratePDF} className="bg-zinc-800 hover:bg-zinc-700 text-xs text-white px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors border border-zinc-700">
+              <Download className="w-3.5 h-3.5"/> PDF
+            </button>
+          </div>
           
           {/* Notificaciones */}
           <div className="relative">
@@ -704,7 +820,7 @@ export default function CicloVerdeApp() {
           {currentUser.role === "restaurant" && activeTab === "solicitudes" && (
             <div className="bg-zinc-900/40 border border-zinc-900 rounded-2xl overflow-hidden">
               <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-950 text-zinc-400"><tr><th className="p-4">Tipo</th><th className="p-4">Fecha</th><th className="p-4">Estado</th><th className="p-4">Peso</th></tr></thead>
+                <thead className="bg-zinc-950 text-zinc-400"><tr><th className="p-4">Tipo</th><th className="p-4">Fecha</th><th className="p-4">Estado</th><th className="p-4">Peso</th><th className="p-4">Acciones</th></tr></thead>
                 <tbody className="divide-y divide-zinc-900">
                   {pickups.map(p => (
                     <tr key={p.id}>
@@ -712,9 +828,16 @@ export default function CicloVerdeApp() {
                       <td className="p-4">{p.date}</td>
                       <td className="p-4"><span className="text-emerald-400">{p.status}</span></td>
                       <td className="p-4">{p.actual_weight ? `${p.actual_weight} Kg` : `${p.estimated_weight} Kg (Est)`}</td>
+                      <td className="p-4">
+                        {p.status === "Pendiente" && (
+                          <button onClick={() => handleCancelPickup(p.id)} className="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded transition-colors">
+                            Cancelar
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
-                  {pickups.length === 0 && <tr><td colSpan={4} className="p-4 text-center">No hay solicitudes</td></tr>}
+                  {pickups.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-zinc-500">No hay solicitudes</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -872,6 +995,7 @@ export default function CicloVerdeApp() {
                         <th className="p-4">Dirección</th>
                         <th className="p-4">Teléfono</th>
                         <th className="p-4">Estado</th>
+                        <th className="p-4">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50">
@@ -903,10 +1027,25 @@ export default function CicloVerdeApp() {
                               {u.status === 'active' ? 'Activo' : 'Inactivo'}
                             </span>
                           </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => {
+                                setEditingUser(u);
+                                setEditUserName(u.name);
+                                setEditUserPhone(u.phone || "");
+                                setEditUserAddress(u.address || "");
+                              }} className="p-1.5 text-zinc-400 hover:text-emerald-400 bg-zinc-800 rounded transition-colors" title="Editar Información">
+                                <Edit className="w-4 h-4"/>
+                              </button>
+                              <button onClick={() => handleToggleUserStatus(u)} className={`p-1.5 rounded transition-colors ${u.status === 'active' ? 'text-zinc-400 hover:text-red-400 bg-zinc-800' : 'text-zinc-400 hover:text-emerald-400 bg-zinc-800'}`} title={u.status === 'active' ? 'Desactivar Cuenta' : 'Activar Cuenta'}>
+                                <Trash2 className="w-4 h-4"/>
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                       {allUsers.filter(u => u.role === 'restaurant').length === 0 && (
-                        <tr><td colSpan={5} className="p-8 text-center text-zinc-500 italic">No hay restaurantes registrados</td></tr>
+                        <tr><td colSpan={6} className="p-8 text-center text-zinc-500 italic">No hay restaurantes registrados</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -927,6 +1066,7 @@ export default function CicloVerdeApp() {
                         <th className="p-4">Teléfono</th>
                         <th className="p-4">Recolecciones</th>
                         <th className="p-4">Estado</th>
+                        <th className="p-4">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50">
@@ -956,10 +1096,25 @@ export default function CicloVerdeApp() {
                               {u.status === 'active' ? 'Activo' : 'Inactivo'}
                             </span>
                           </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => {
+                                setEditingUser(u);
+                                setEditUserName(u.name);
+                                setEditUserPhone(u.phone || "");
+                                setEditUserAddress(u.address || "");
+                              }} className="p-1.5 text-zinc-400 hover:text-amber-400 bg-zinc-800 rounded transition-colors" title="Editar Información">
+                                <Edit className="w-4 h-4"/>
+                              </button>
+                              <button onClick={() => handleToggleUserStatus(u)} className={`p-1.5 rounded transition-colors ${u.status === 'active' ? 'text-zinc-400 hover:text-red-400 bg-zinc-800' : 'text-zinc-400 hover:text-emerald-400 bg-zinc-800'}`} title={u.status === 'active' ? 'Desactivar Cuenta' : 'Activar Cuenta'}>
+                                <Trash2 className="w-4 h-4"/>
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                       {allUsers.filter(u => u.role === 'collector').length === 0 && (
-                        <tr><td colSpan={5} className="p-8 text-center text-zinc-500 italic">No hay recolectores registrados</td></tr>
+                        <tr><td colSpan={6} className="p-8 text-center text-zinc-500 italic">No hay recolectores registrados</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1009,6 +1164,13 @@ export default function CicloVerdeApp() {
                 <button type="submit" disabled={isLoading} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3.5 px-6 rounded-xl w-full transition-colors mt-4 shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2">
                   {isLoading ? 'Guardando...' : 'Guardar Todos los Cambios'}
                 </button>
+                
+                <div className="pt-8 mt-8 border-t border-zinc-800/50">
+                  <h4 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-2">Zona de Peligro</h4>
+                  <button type="button" onClick={handleRequestAccountDeletion} className="w-full bg-red-950/30 hover:bg-red-900/40 text-red-400 font-bold py-3 px-6 rounded-xl border border-red-900/50 transition-colors text-sm">
+                    Solicitar Baja de la Cuenta
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -1016,6 +1178,32 @@ export default function CicloVerdeApp() {
         </div>
 
         {/* Modals for Assignment and Completion */}
+        {editingUser && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
+            <div className="bg-zinc-900 p-6 rounded-3xl w-full max-w-md border border-zinc-800 shadow-2xl">
+              <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2"><Edit className="w-5 h-5 text-emerald-400"/> Editar {editingUser.role === 'restaurant' ? 'Restaurante' : 'Recolector'}</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nombre / Empresa</label>
+                  <input type="text" value={editUserName} onChange={e => setEditUserName(e.target.value)} className="w-full p-3 bg-zinc-950 border border-zinc-800 text-white rounded-xl focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Dirección</label>
+                  <input type="text" value={editUserAddress} onChange={e => setEditUserAddress(e.target.value)} className="w-full p-3 bg-zinc-950 border border-zinc-800 text-white rounded-xl focus:border-emerald-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Teléfono</label>
+                  <input type="text" value={editUserPhone} onChange={e => setEditUserPhone(e.target.value)} className="w-full p-3 bg-zinc-950 border border-zinc-800 text-white rounded-xl focus:border-emerald-500" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-8">
+                <button onClick={() => setEditingUser(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-xl transition-colors font-semibold">Cancelar</button>
+                <button onClick={handleSaveUserEdit} disabled={isLoading} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black p-3 rounded-xl font-bold transition-colors">{isLoading ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {assigningPickupId && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
             <div className="bg-zinc-900 p-6 rounded-2xl w-full max-w-md">
