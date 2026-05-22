@@ -77,6 +77,7 @@ export default function CicloVerdeApp() {
 
   // Auth Forms
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   // State to keep temporary status changes made by admin in the "solicitudes" table
   const [adminStatusUpdates, setAdminStatusUpdates] = useState<Record<string, string>>({});
   const [authEmail, setAuthEmail] = useState("");
@@ -130,6 +131,11 @@ export default function CicloVerdeApp() {
       mySession = session;
       if (session) {
         fetchInitialData(session.user.id);
+        if (_event === 'PASSWORD_RECOVERY') {
+          setActiveTab('perfil');
+          setIsEditingProfile(true);
+          setProfileMessage("Por favor, ingresa tu nueva contraseña y presiona 'Guardar Todos los Cambios'.");
+        }
       } else {
         setCurrentUser(null);
         setPickups([]);
@@ -236,14 +242,34 @@ export default function CicloVerdeApp() {
       if (error) {
         setAuthError(error.message);
       } else {
-        setAuthMessage("¡Registro exitoso! Ya puedes iniciar sesión.");
-        setIsLogin(true);
+        setAuthMessage("Por favor verifica tu correo para confirmar tu registro.");
       }
     }
     setIsLoading(false);
   };
 
-
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail) {
+      setAuthError("Por favor ingresa tu correo electrónico.");
+      return;
+    }
+    setIsLoading(true);
+    setAuthError("");
+    setAuthMessage("");
+    
+    // Asume que Vercel origin funciona, sino supabase usará el default del Dashboard
+    const { error } = await supabase.auth.resetPasswordForEmail(authEmail, {
+      redirectTo: window.location.origin
+    });
+    
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      setAuthMessage("Se ha enviado un enlace a tu correo para restablecer tu contraseña.");
+    }
+    setIsLoading(false);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -548,32 +574,80 @@ export default function CicloVerdeApp() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>          <div className="md:col-span-6 bg-zinc-950/90 border border-emerald-900/30 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-blue-500"></div>
+            
+            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Bienvenido a <br/><span className="text-emerald-400">Ciclo Verde</span></h2>
+            <p className="text-zinc-400 mb-8 text-sm">Ingresa a la plataforma para gestionar recolecciones.</p>
 
-          <div className="md:col-span-6 bg-zinc-950/90 border border-emerald-900/30 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl">
-            <div className="flex justify-center mb-6 border-b border-zinc-800 pb-2">
-              <button 
-                onClick={() => setIsLogin(true)} 
-                className={`flex-1 pb-2 font-bold transition-colors ${isLogin ? "text-emerald-400 border-b-2 border-emerald-500" : "text-zinc-500"}`}
-              >
-                Ingresar
-              </button>
-              <button 
-                onClick={() => setIsLogin(false)} 
-                className={`flex-1 pb-2 font-bold transition-colors ${!isLogin ? "text-emerald-400 border-b-2 border-emerald-500" : "text-zinc-500"}`}
-              >
-                Crear Cuenta
-              </button>
-            </div>
+            {!isResetPassword && (
+              <div className="flex justify-center mb-6 border-b border-zinc-800 pb-2">
+                <button 
+                  onClick={() => setIsLogin(true)} 
+                  className={`flex-1 pb-2 font-bold transition-colors ${isLogin ? "text-emerald-400 border-b-2 border-emerald-500" : "text-zinc-500"}`}
+                >
+                  Ingresar
+                </button>
+                <button 
+                  onClick={() => setIsLogin(false)} 
+                  className={`flex-1 pb-2 font-bold transition-colors ${!isLogin ? "text-emerald-400 border-b-2 border-emerald-500" : "text-zinc-500"}`}
+                >
+                  Crear Cuenta
+                </button>
+              </div>
+            )}
 
-            <form onSubmit={handleAuth} className="space-y-4">
-              {!isLogin && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-300 uppercase mb-1">Nombre Comercial o Personal</label>
-                    <input
-                      type="text"
-                      value={authName}
+            {isResetPassword ? (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <p className="text-zinc-300 text-sm mb-4">Ingresa tu correo para recibir un enlace seguro y restablecer tu contraseña.</p>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 uppercase mb-1">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500"
+                    required
+                  />
+                </div>
+
+                {authError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-950/30 border border-red-900/50 rounded-xl text-red-200 text-xs">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{authError}</span>
+                  </div>
+                )}
+                
+                {authMessage && (
+                  <div className="flex items-center gap-2 p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-emerald-200 text-xs">
+                    <CheckCircle className="w-4 h-4 flex-shrink-0" /><span>{authMessage}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg mt-4"
+                >
+                  {isLoading ? "Enviando..." : "Enviar Enlace"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setIsResetPassword(false); setAuthError(""); setAuthMessage(""); }}
+                  className="w-full mt-2 text-zinc-400 hover:text-white text-sm transition-colors py-2 block text-center"
+                >
+                  Volver a Iniciar Sesión
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAuth} className="space-y-4">
+                {!isLogin && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-300 uppercase mb-1">Nombre Comercial o Personal</label>
+                      <input
+                        type="text"
+                        value={authName}
                       onChange={(e) => setAuthName(e.target.value)}
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-emerald-500"
                       required
@@ -627,6 +701,18 @@ export default function CicloVerdeApp() {
                 </div>
               )}
 
+              {isLogin && (
+                <div className="flex justify-end mt-1">
+                  <button 
+                    type="button" 
+                    onClick={() => { setIsResetPassword(true); setAuthError(""); setAuthMessage(""); }} 
+                    className="text-emerald-400 hover:text-emerald-300 text-xs transition-colors"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -635,8 +721,8 @@ export default function CicloVerdeApp() {
                 {isLoading ? "Procesando..." : (isLogin ? "Iniciar Sesión" : "Registrarse")}
               </button>
               
-              
             </form>
+            )}
           </div>
         </div>
       </div>
