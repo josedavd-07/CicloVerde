@@ -600,6 +600,13 @@ export default function CicloVerdeApp() {
               <>
                 <button onClick={() => setActiveTab("dashboard")} className={`w-full text-left py-2 px-3 rounded-lg text-sm transition-all flex items-center gap-3 ${activeTab === "dashboard" ? "bg-blue-500/10 text-blue-400" : "text-zinc-400 hover:bg-zinc-900"}`}><BarChart3 className="w-4 h-4"/> Global</button>
                 <button onClick={() => setActiveTab("solicitudes")} className={`w-full text-left py-2 px-3 rounded-lg text-sm transition-all flex items-center gap-3 ${activeTab === "solicitudes" ? "bg-blue-500/10 text-blue-400" : "text-zinc-400 hover:bg-zinc-900"}`}><FileText className="w-4 h-4"/> Gestión Recolecciones</button>
+                <button onClick={() => setActiveTab("usuarios")} className={`w-full text-left py-2 px-3 rounded-lg text-sm transition-all flex items-center gap-3 ${activeTab === "usuarios" ? "bg-blue-500/10 text-blue-400" : "text-zinc-400 hover:bg-zinc-900"}`}>
+                  <Users className="w-4 h-4"/>
+                  Usuarios
+                  {allUsers.filter(u => u.role !== 'admin').length > 0 && (
+                    <span className="ml-auto bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">{allUsers.filter(u => u.role !== 'admin').length}</span>
+                  )}
+                </button>
                 <button onClick={() => setActiveTab("perfil")} className={`w-full text-left py-2 px-3 rounded-lg text-sm transition-all flex items-center gap-3 ${activeTab === "perfil" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900"}`}><Shield className="w-4 h-4"/> Mi Perfil</button>
               </>
             )}
@@ -847,7 +854,120 @@ export default function CicloVerdeApp() {
             </div>
           )}
 
-          {/* ================================== PERFIL COMÚN ================================== */}
+          {/* ================================== ADMIN USUARIOS ================================== */}
+          {currentUser.role === "admin" && activeTab === "usuarios" && (
+            <div className="space-y-8">
+              
+              {/* Restaurantes */}
+              <div>
+                <h2 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                  <Leaf className="w-5 h-5"/> Restaurantes ({allUsers.filter(u => u.role === 'restaurant').length})
+                </h2>
+                <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-zinc-950/80 text-zinc-400 text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="p-4">Nombre / Empresa</th>
+                        <th className="p-4">Correo</th>
+                        <th className="p-4">Dirección</th>
+                        <th className="p-4">Teléfono</th>
+                        <th className="p-4">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/50">
+                      {allUsers.filter(u => u.role === 'restaurant').map(u => (
+                        <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-emerald-900/50 flex items-center justify-center border border-emerald-500/30 text-emerald-400 font-bold text-sm shrink-0">
+                                {u.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium text-white">{u.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-zinc-300">{u.email}</td>
+                          <td className="p-4">
+                            {u.address 
+                              ? <span className="text-zinc-300 flex items-center gap-1"><MapPin className="w-3 h-3 text-emerald-500 shrink-0"/> {u.address}</span>
+                              : <span className="text-zinc-600 italic text-xs">Sin dirección</span>
+                            }
+                          </td>
+                          <td className="p-4">
+                            {u.phone 
+                              ? <span className="text-zinc-300">{u.phone}</span>
+                              : <span className="text-zinc-600 italic text-xs">Sin teléfono</span>
+                            }
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${u.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                              {u.status === 'active' ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {allUsers.filter(u => u.role === 'restaurant').length === 0 && (
+                        <tr><td colSpan={5} className="p-8 text-center text-zinc-500 italic">No hay restaurantes registrados</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Recolectores */}
+              <div>
+                <h2 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+                  <Truck className="w-5 h-5"/> Recolectores ({allUsers.filter(u => u.role === 'collector').length})
+                </h2>
+                <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-zinc-950/80 text-zinc-400 text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="p-4">Nombre</th>
+                        <th className="p-4">Correo</th>
+                        <th className="p-4">Teléfono</th>
+                        <th className="p-4">Recolecciones</th>
+                        <th className="p-4">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/50">
+                      {allUsers.filter(u => u.role === 'collector').map(u => (
+                        <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-amber-900/50 flex items-center justify-center border border-amber-500/30 text-amber-400 font-bold text-sm shrink-0">
+                                {u.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium text-white">{u.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-zinc-300">{u.email}</td>
+                          <td className="p-4">
+                            {u.phone 
+                              ? <span className="text-zinc-300">{u.phone}</span>
+                              : <span className="text-zinc-600 italic text-xs">Sin teléfono</span>
+                            }
+                          </td>
+                          <td className="p-4">
+                            <span className="font-bold text-white">{pickups.filter(p => p.collector_id === u.id && p.status === 'Completado').length}</span>
+                            <span className="text-zinc-500 text-xs ml-1">completadas</span>
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${u.status === 'active' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                              {u.status === 'active' ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {allUsers.filter(u => u.role === 'collector').length === 0 && (
+                        <tr><td colSpan={5} className="p-8 text-center text-zinc-500 italic">No hay recolectores registrados</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === "perfil" && (
             <div className="max-w-xl bg-zinc-900/70 backdrop-blur-md border border-zinc-800 p-8 rounded-3xl mt-6 shadow-2xl">
               <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400"/> Datos del Perfil y Seguridad</h3>
