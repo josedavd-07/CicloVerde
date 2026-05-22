@@ -124,12 +124,11 @@ export default function CicloVerdeApp() {
       }
     });
 
-    // Realtime subscription for pickups
+    // Realtime subscription for pickups (Si está habilitado en Supabase)
     const channel = supabase
       .channel('realtime_pickups')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pickups' }, (payload) => {
         if (mySession) fetchInitialData(mySession.user.id);
-        
         if (payload.eventType === 'INSERT') {
           setNotifications(prev => [`Nueva solicitud de recolección: ${payload.new.waste_type}`, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
@@ -138,9 +137,26 @@ export default function CicloVerdeApp() {
       })
       .subscribe();
 
+    // POLLEO CADA 5 SEGUNDOS (Garantiza actualización constante sin recargar la página)
+    const interval = setInterval(async () => {
+      if (mySession) {
+        const { data } = await supabase.from("pickups").select("*").order("created_at", { ascending: false });
+        if (data) {
+          setPickups(prev => {
+            // Si hay un pedido nuevo que no estaba en el estado anterior, lanzar notificación a la campanita
+            if (prev.length > 0 && data.length > prev.length) {
+              setNotifications(n => [`¡Tienes un nuevo movimiento en el panel!`, ...n]);
+            }
+            return data as PickupRequest[];
+          });
+        }
+      }
+    }, 5000);
+
     return () => {
       subscription.unsubscribe();
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 
@@ -495,12 +511,15 @@ export default function CicloVerdeApp() {
   // MAIN APP DASHBOARD
   // -----------------------------------------------------
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row relative overflow-hidden">
-      {/* Dynamic Background Glassmorphism */}
-      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-900/10 blur-[100px] rounded-full"></div>
-         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-900/10 blur-[120px] rounded-full"></div>
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-amber-900/5 blur-[150px] rounded-full"></div>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url('/Dashboard_admind_restaurant_recollector.png')` }}>
+      {/* Capa oscura para que el texto siga siendo 100% legible sobre tu imagen */}
+      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-[2px] z-0 pointer-events-none"></div>
+
+      {/* Dynamic Background Glassmorphism (Luces de tu paleta sobre la imagen) */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden mix-blend-screen">
+         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-900/20 blur-[100px] rounded-full"></div>
+         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-900/20 blur-[120px] rounded-full"></div>
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-amber-900/10 blur-[150px] rounded-full"></div>
       </div>
 
       {/* Sidebar */}
