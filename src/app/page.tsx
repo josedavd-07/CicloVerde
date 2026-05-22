@@ -99,6 +99,7 @@ export default function CicloVerdeApp() {
   const [profileAddress, setProfileAddress] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   // Modals
   const [assigningPickupId, setAssigningPickupId] = useState<string | null>(null);
@@ -304,6 +305,7 @@ export default function CicloVerdeApp() {
           : "¡Perfil actualizado correctamente!");
         // Actualizar estado local
         setCurrentUser({ ...currentUser, address: profileAddress, phone: profilePhone });
+        setIsEditingProfile(false);
       }
     }
     
@@ -1124,54 +1126,110 @@ export default function CicloVerdeApp() {
           )}
 
           {activeTab === "perfil" && (
-            <div className="max-w-xl bg-zinc-900/70 backdrop-blur-md border border-zinc-800 p-8 rounded-3xl mt-6 shadow-2xl">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400"/> Datos del Perfil y Seguridad</h3>
-              <form onSubmit={handleUpdateProfile} className="space-y-5">
-                
-                {/* Datos Públicos (Dirección y Teléfono) */}
-                <div className="space-y-4 pb-6 border-b border-zinc-800">
-                  <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Información de Contacto</h4>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Dirección de Recolección</label>
-                    <input type="text" value={profileAddress} onChange={e => setProfileAddress(e.target.value)} placeholder="Ej: Av. Principal 123, Local 4" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
-                    <p className="text-xs text-zinc-500 mt-1">Los recolectores usarán esta dirección para llegar a ti.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Teléfono</label>
-                    <input type="tel" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="Ej: +57 300 000 0000" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
-                  </div>
-                </div>
-
-                {/* Datos Privados (Auth) */}
-                <div className="space-y-4 pt-2">
-                  <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Credenciales de Acceso</h4>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nuevo Correo (Opcional)</label>
-                    <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder={session?.user?.email} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nueva Contraseña (Opcional)</label>
-                    <input type="password" value={profilePassword} onChange={e => setProfilePassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
-                  </div>
-                </div>
-
-                {profileMessage && (
-                  <div className="p-4 bg-emerald-900/20 border border-emerald-900/50 rounded-xl animate-fade-in">
-                    <p className="text-sm text-emerald-400 flex items-center gap-2 font-medium"><CheckCircle className="w-5 h-5"/> {profileMessage}</p>
-                  </div>
-                )}
-                
-                <button type="submit" disabled={isLoading} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3.5 px-6 rounded-xl w-full transition-colors mt-4 shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2">
-                  {isLoading ? 'Guardando...' : 'Guardar Todos los Cambios'}
-                </button>
-                
-                <div className="pt-8 mt-8 border-t border-zinc-800/50">
-                  <h4 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-2">Zona de Peligro</h4>
-                  <button type="button" onClick={handleRequestAccountDeletion} className="w-full bg-red-950/30 hover:bg-red-900/40 text-red-400 font-bold py-3 px-6 rounded-xl border border-red-900/50 transition-colors text-sm">
-                    Solicitar Baja de la Cuenta
+            <div className="max-w-xl bg-zinc-900/70 backdrop-blur-md border border-zinc-800 p-8 rounded-3xl mt-6 shadow-2xl relative">
+              
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400"/> Datos del Perfil y Seguridad</h3>
+                {!isEditingProfile && (
+                  <button onClick={() => {
+                    setProfileAddress(currentUser?.address || "");
+                    setProfilePhone(currentUser?.phone || "");
+                    setIsEditingProfile(true);
+                    setProfileMessage("");
+                  }} className="text-zinc-400 hover:text-emerald-400 transition-colors bg-zinc-800/50 p-2 rounded-lg" title="Editar Perfil">
+                    <Edit className="w-4 h-4"/>
                   </button>
+                )}
+              </div>
+
+              {profileMessage && !isEditingProfile && (
+                <div className="mb-4 p-4 bg-emerald-900/20 border border-emerald-900/50 rounded-xl animate-fade-in">
+                  <p className="text-sm text-emerald-400 flex items-center gap-2 font-medium"><CheckCircle className="w-5 h-5"/> {profileMessage}</p>
                 </div>
-              </form>
+              )}
+
+              {!isEditingProfile ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4 bg-zinc-950/40 p-4 rounded-xl border border-zinc-800/50">
+                    <div>
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Nombre</p>
+                      <p className="text-zinc-200">{currentUser?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Rol</p>
+                      <p className="text-emerald-400 capitalize">{currentUser?.role === 'restaurant' ? 'Restaurante' : currentUser?.role}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Correo Electrónico</p>
+                      <p className="text-zinc-200">{session?.user?.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-800/50 space-y-4">
+                    <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider border-b border-zinc-800/50 pb-2">Información de Contacto</h4>
+                    <div>
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1 flex items-center gap-2"><MapPin className="w-3 h-3"/> Dirección de Recolección</p>
+                      <p className="text-zinc-200">{currentUser?.address || <span className="italic text-zinc-600">No registrada</span>}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1 flex items-center gap-2"><span className="text-xs">📞</span> Teléfono</p>
+                      <p className="text-zinc-200">{currentUser?.phone || <span className="italic text-zinc-600">No registrado</span>}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleUpdateProfile} className="space-y-5">
+                  
+                  {/* Datos Públicos (Dirección y Teléfono) */}
+                  <div className="space-y-4 pb-6 border-b border-zinc-800">
+                    <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Información de Contacto</h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Dirección de Recolección</label>
+                      <input type="text" value={profileAddress} onChange={e => setProfileAddress(e.target.value)} placeholder="Ej: Av. Principal 123, Local 4" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                      <p className="text-xs text-zinc-500 mt-1">Los recolectores usarán esta dirección para llegar a ti.</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Teléfono</label>
+                      <input type="tel" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="Ej: +57 300 000 0000" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                    </div>
+                  </div>
+
+                  {/* Datos Privados (Auth) */}
+                  <div className="space-y-4 pt-2">
+                    <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Credenciales de Acceso</h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nuevo Correo (Opcional)</label>
+                      <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder={session?.user?.email} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Nueva Contraseña (Opcional)</label>
+                      <input type="password" value={profilePassword} onChange={e => setProfilePassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:border-emerald-500 transition-colors" />
+                    </div>
+                  </div>
+
+                  {profileMessage && (
+                    <div className="p-4 bg-emerald-900/20 border border-emerald-900/50 rounded-xl animate-fade-in">
+                      <p className="text-sm text-emerald-400 flex items-center gap-2 font-medium"><CheckCircle className="w-5 h-5"/> {profileMessage}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => { setIsEditingProfile(false); setProfileMessage(""); }} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3.5 px-6 rounded-xl w-1/3 transition-colors shadow-lg flex justify-center items-center">
+                      Cancelar
+                    </button>
+                    <button type="submit" disabled={isLoading} className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3.5 px-6 rounded-xl w-2/3 transition-colors shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2">
+                      {isLoading ? 'Guardando...' : 'Guardar Cambios'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="pt-8 mt-8 border-t border-zinc-800/50">
+                <h4 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-2">Zona de Peligro</h4>
+                <button type="button" onClick={handleRequestAccountDeletion} className="w-full bg-red-950/30 hover:bg-red-900/40 text-red-400 font-bold py-3 px-6 rounded-xl border border-red-900/50 transition-colors text-sm">
+                  Solicitar Baja de la Cuenta
+                </button>
+              </div>
             </div>
           )}
 
